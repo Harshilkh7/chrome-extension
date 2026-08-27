@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ExtensPro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      width: 300px;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #141e30, #243b55);
+      color: white;
+    }
+    #top-bar {
+      display: flex; justify-content: flex-end;
+      padding: 10px 12px 0;
+    }
+    #logout-btn {
+      border: none; border-radius: 6px;
+      padding: 6px 12px; cursor: pointer;
+      font-weight: 600; background: #ff4c4c; color: white;
+      display: none;
+    }
+    #login-section, #status-section {
+      box-sizing: border-box;
+      display: flex; flex-direction: column;
+      padding: 16px 20px 20px;
+      gap: 12px;
+    }
+    #login-form { display: flex; flex-direction: column; gap: 10px; }
+    #login-form input {
+      padding: 8px; font-size: 14px; border-radius: 5px; border: none;
+    }
+    #login-form button, #monitor-btn, #dashboard-btn {
+      padding: 10px; font-size: 15px;
+      border: none; border-radius: 5px;
+      cursor: pointer; background: #1e90ff; color: white;
+    }
+    #monitor-btn.on { background: #2e9e4f; }
+    #monitor-btn.off { background: #ff4c4c; }
+    #dashboard-btn { background: #4c5fff; }
+    #monitoring-text {
+      font-size: 15px; font-weight: 600; margin-bottom: 4px;
+      text-align: center;
+    }
+    #site-status {
+      font-size: 12px; color: #cbd5f5; text-align: center; min-height: 16px;
+    }
+    .register-link {
+      text-align: center; font-size: 13px;
+      color: #add8e6; text-decoration: underline; cursor: pointer;
+    }
+    .toast {
+      visibility: hidden; position: fixed; bottom: 10px;
+      left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.85); color: white;
+      padding: 8px 16px; border-radius: 8px; font-size: 13px;
+      transition: opacity 0.3s; opacity: 0; z-index: 1000;
+    }
+    .toast.show { visibility: visible; opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="top-bar">
+    <button id="logout-btn">Logout</button>
+  </div>
+
+  <div id="login-section">
+    <form id="login-form">
+      <input type="email" id="email" placeholder="Email address" required autocomplete="email" />
+      <input type="password" id="password" placeholder="Password" required autocomplete="current-password" />
+      <button type="submit">Login</button>
+    </form>
+    <a id="register-link" class="register-link">Don't have an account? Register</a>
+  </div>
+
+  <div id="status-section" style="display:none;">
+    <div id="monitoring-text">Monitoring is on</div>
+    <button id="monitor-btn" class="on">Turn Off Monitoring</button>
+    <div id="site-status"></div>
+    <button id="dashboard-btn">Open Dashboard</button>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="config.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
