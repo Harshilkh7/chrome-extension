@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { socket, connectSocket, disconnectSocket } from '../services/socket';
 import { motion } from 'framer-motion';
 import { ExternalLink, ShieldCheck, XCircle, CalendarDays } from 'lucide-react';
 import api from '../services/api';
@@ -20,6 +21,42 @@ export default function Dashboard() {
         setLoading(false);
       }
     })();
+  }, []);
+
+    useEffect(() => {
+    connectSocket();
+
+    const handleConsentUpdated = (updatedConsent) => {
+      setConsents((currentConsents) => {
+        const exists = currentConsents.some(
+          (consent) => consent._id === updatedConsent._id
+        );
+
+        if (exists) {
+          return currentConsents.map((consent) =>
+            consent._id === updatedConsent._id
+              ? updatedConsent
+              : consent
+          );
+        }
+
+        return [updatedConsent, ...currentConsents];
+      });
+    };
+
+    socket.on(
+      'consent-updated',
+      handleConsentUpdated
+    );
+
+    return () => {
+      socket.off(
+        'consent-updated',
+        handleConsentUpdated
+      );
+
+      disconnectSocket();
+    };
   }, []);
 
   const renderPermissions = (consent) =>

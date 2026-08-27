@@ -1,6 +1,8 @@
 const dns = require('dns');
 dns.setServers(['8.8.8.8', '1.1.1.1']);
 
+const http = require('http');
+const { initSocket } = require('./socket');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -77,6 +79,10 @@ app.use('/api', (req, res) => {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+const server = http.createServer(app);
+
+initSocket(server);
+
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`.bgMagenta);
 });

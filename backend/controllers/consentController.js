@@ -1,4 +1,5 @@
 const ConsentLog = require('../models/ConsentLog');
+const { getIO } = require('../socket');
 
 function isValidDataShared(dataShared) {
   return (
@@ -50,6 +51,10 @@ exports.logConsent = async (req, res) => {
       { upsert: true, new: true }
     );
 
+getIO()
+  .to(`user:${req.user.id}`)
+  .emit('consent-updated', updatedConsent);
+
     return res.status(existingConsent ? 200 : 201).json({
       message: existingConsent ? 'Consent updated' : 'Consent created',
       consent: updatedConsent,
@@ -87,28 +92,53 @@ exports.updateConsent = async (req, res) => {
       });
     }
 
-    const consent = await ConsentLog.findOne({ _id: id, userId: req.user.id });
+    const consent = await ConsentLog.findOne({
+      _id: id,
+      userId: req.user.id
+    });
+
     if (!consent) {
-      return res.status(404).json({ error: 'Consent not found' });
+      return res.status(404).json({
+        error: 'Consent not found'
+      });
     }
 
     dataShared.forEach(({ permission, granted }) => {
-      const entry = consent.dataShared.find((e) => e.permission === permission);
+      const entry = consent.dataShared.find(
+        (e) => e.permission === permission
+      );
+
       if (entry) {
         entry.granted = granted;
       } else {
-        consent.dataShared.push({ permission, granted });
+        consent.dataShared.push({
+          permission,
+          granted
+        });
       }
     });
 
-    consent.consentGiven = consent.dataShared.every((e) => e.granted);
+    consent.consentGiven = consent.dataShared.every(
+      (e) => e.granted
+    );
 
     await consent.save();
 
-    return res.status(200).json({ message: 'Consent updated', consent });
+    // Send real-time update to dashboard
+    getIO()
+      .to(`user:${req.user.id}`)
+      .emit('consent-updated', consent);
+
+    return res.status(200).json({
+      message: 'Consent updated',
+      consent
+    });
+
   } catch (err) {
     console.error('[ERROR] updateConsent failed:', err);
-    return res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({
+      error: 'Server error'
+    });
   }
 };
 
