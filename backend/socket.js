@@ -23,24 +23,6 @@ function initSocket(server) {
       );
     });
 
-    socket.on('consent-updated', (updatedConsent) => {
-        setConsents((prev) => {
-            const exists = prev.some(
-            (consent) => consent._id === updatedConsent._id
-            );
-
-            if (exists) {
-            return prev.map((consent) =>
-                consent._id === updatedConsent._id
-                ? updatedConsent
-                : consent
-            );
-            }
-
-            return [updatedConsent, ...prev];
-        });
-        });
-
     socket.on('disconnect', () => {
       console.log('Dashboard disconnected:', socket.id);
     });
