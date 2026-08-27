@@ -38,21 +38,23 @@ mongoose
 // machine for an unpacked/dev install, so we allow any chrome-extension
 // origin rather than trying to hardcode one.
 // ---------------------------------------------------------------
-const allowedOrigins = (process.env.CLIENT_ORIGINS || 'http://localhost:5173')
-  .split(',')
-  .map((o) => o.trim())
-  .filter(Boolean);
+// const allowedOrigins = (process.env.CLIENT_ORIGINS || 'http://localhost:5173')
+//   .split(',')
+//   .map((o) => o.trim())
+//   .filter(Boolean);
 
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin) return callback(null, true); // curl/postman/no-origin requests
-      if (origin.startsWith('chrome-extension://')) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error(`Origin ${origin} not allowed by CORS`));
-    },
-  })
-);
+// app.use(
+//   cors({
+//     origin(origin, callback) {
+//       if (!origin) return callback(null, true); // curl/postman/no-origin requests
+//       if (origin.startsWith('chrome-extension://')) return callback(null, true);
+//       if (allowedOrigins.includes(origin)) return callback(null, true);
+//       return callback(new Error(`Origin ${origin} not allowed by CORS`));
+//     },
+//   })
+// );
+
+app.use(cors());
 
 app.use(morgan('dev'));
 app.use(express.json());
