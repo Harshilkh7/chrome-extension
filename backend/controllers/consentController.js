@@ -14,88 +14,211 @@ function isValidDataShared(dataShared) {
   );
 }
 
+/*
+ * Emit a consent update to the user's dashboard.
+ */
+function emitConsentUpdated(userId, consent) {
+  try {
+    const io = getIO();
+
+    const room = `user:${userId}`;
+
+    console.log(
+      `Emitting consent-updated to ${room}`
+    );
+
+    io.to(room).emit(
+      'consent-updated',
+      consent
+    );
+  } catch (error) {
+    console.error(
+      'Socket emit error:',
+      error.message
+    );
+  }
+}
+
+
 // POST /api/consent/log
-// Create a consent record for a service, or merge into an existing one.
+// Create a consent record for a service,
+// or merge into an existing one.
 exports.logConsent = async (req, res) => {
   try {
-    const { service, dataShared, consentGiven } = req.body;
+    const {
+      service,
+      dataShared,
+      consentGiven
+    } = req.body;
 
-    if (!service || typeof service !== 'string') {
-      return res.status(400).json({ error: 'service is required' });
-    }
-    if (!isValidDataShared(dataShared)) {
+    if (
+      !service ||
+      typeof service !== 'string'
+    ) {
       return res.status(400).json({
-        error: 'Each item in dataShared must have permission (string) and granted (boolean)',
+        error: 'service is required'
       });
     }
 
-    const existingConsent = await ConsentLog.findOne({ userId: req.user.id, service });
+    if (!isValidDataShared(dataShared)) {
+      return res.status(400).json({
+        error:
+          'Each item in dataShared must have permission (string) and granted (boolean)'
+      });
+    }
+
+    const existingConsent =
+      await ConsentLog.findOne({
+        userId: req.user.id,
+        service
+      });
 
     let mergedDataShared = dataShared;
+
+    /*
+     * If consent already exists, merge the new
+     * permissions with the existing permissions.
+     */
     if (existingConsent) {
-      const mergedMap = new Map(existingConsent.dataShared.map((e) => [e.permission, e.granted]));
+      const mergedMap = new Map(
+        existingConsent.dataShared.map(
+          (entry) => [
+            entry.permission,
+            entry.granted
+          ]
+        )
+      );
+
       for (const incoming of dataShared) {
-        mergedMap.set(incoming.permission, incoming.granted);
+        mergedMap.set(
+          incoming.permission,
+          incoming.granted
+        );
       }
-      mergedDataShared = Array.from(mergedMap, ([permission, granted]) => ({ permission, granted }));
+
+      mergedDataShared = Array.from(
+        mergedMap,
+        ([permission, granted]) => ({
+          permission,
+          granted
+        })
+      );
     }
 
-    const updatedConsent = await ConsentLog.findOneAndUpdate(
-      { userId: req.user.id, service },
-      {
-        $set: {
-          dataShared: mergedDataShared,
-          consentGiven: Boolean(consentGiven),
+    const updatedConsent =
+      await ConsentLog.findOneAndUpdate(
+        {
+          userId: req.user.id,
+          service
         },
-      },
-      { upsert: true, new: true }
+        {
+          $set: {
+            dataShared: mergedDataShared,
+            consentGiven: Boolean(
+              consentGiven
+            )
+          }
+        },
+        {
+          upsert: true,
+          new: true
+        }
+      );
+
+    /*
+     * Send real-time update to dashboard.
+     */
+    emitConsentUpdated(
+      req.user.id,
+      updatedConsent
     );
 
-getIO()
-  .to(`user:${req.user.id}`)
-  .emit('consent-updated', updatedConsent);
+    return res
+      .status(
+        existingConsent ? 200 : 201
+      )
+      .json({
+        message: existingConsent
+          ? 'Consent updated'
+          : 'Consent created',
 
-    return res.status(existingConsent ? 200 : 201).json({
-      message: existingConsent ? 'Consent updated' : 'Consent created',
-      consent: updatedConsent,
-    });
+        consent: updatedConsent
+      });
+
   } catch (err) {
     if (err.code === 11000) {
-      return res.status(409).json({ error: 'Duplicate consent entry' });
+      return res.status(409).json({
+        error:
+          'Duplicate consent entry'
+      });
     }
-    console.error('[ERROR] logConsent failed:', err);
-    return res.status(500).json({ error: 'Server error' });
+
+    console.error(
+      '[ERROR] logConsent failed:',
+      err
+    );
+
+    return res.status(500).json({
+      error: 'Server error'
+    });
   }
 };
+
 
 // GET /api/consent/my-consents
-exports.getUserConsents = async (req, res) => {
+exports.getUserConsents = async (
+  req,
+  res
+) => {
   try {
-    const consents = await ConsentLog.find({ userId: req.user.id }).sort({ timestamp: -1 });
-    res.status(200).json(consents);
+    const consents =
+      await ConsentLog.find({
+        userId: req.user.id
+      }).sort({
+        timestamp: -1
+      });
+
+    return res
+      .status(200)
+      .json(consents);
+
   } catch (err) {
-    console.error('Fetch consent error:', err);
-    res.status(500).json({ error: 'Server error while fetching consents' });
+    console.error(
+      'Fetch consent error:',
+      err
+    );
+
+    return res.status(500).json({
+      error:
+        'Server error while fetching consents'
+    });
   }
 };
 
+
 // PUT /api/consent/update/:id
-// Update (or add) individual permission entries on an existing consent record.
-exports.updateConsent = async (req, res) => {
+// Update or add individual permission
+// entries on an existing consent record.
+exports.updateConsent = async (
+  req,
+  res
+) => {
   try {
     const { id } = req.params;
     const { dataShared } = req.body;
 
     if (!isValidDataShared(dataShared)) {
       return res.status(400).json({
-        error: 'Each dataShared item must have a valid permission (string) and granted (boolean)',
+        error:
+          'Each dataShared item must have a valid permission (string) and granted (boolean)'
       });
     }
 
-    const consent = await ConsentLog.findOne({
-      _id: id,
-      userId: req.user.id
-    });
+    const consent =
+      await ConsentLog.findOne({
+        _id: id,
+        userId: req.user.id
+      });
 
     if (!consent) {
       return res.status(404).json({
@@ -103,31 +226,51 @@ exports.updateConsent = async (req, res) => {
       });
     }
 
-    dataShared.forEach(({ permission, granted }) => {
-      const entry = consent.dataShared.find(
-        (e) => e.permission === permission
-      );
+    /*
+     * Update existing permissions or add
+     * new permissions.
+     */
+    dataShared.forEach(
+      ({
+        permission,
+        granted
+      }) => {
+        const entry =
+          consent.dataShared.find(
+            (e) =>
+              e.permission ===
+              permission
+          );
 
-      if (entry) {
-        entry.granted = granted;
-      } else {
-        consent.dataShared.push({
-          permission,
-          granted
-        });
+        if (entry) {
+          entry.granted = granted;
+        } else {
+          consent.dataShared.push({
+            permission,
+            granted
+          });
+        }
       }
-    });
-
-    consent.consentGiven = consent.dataShared.every(
-      (e) => e.granted
     );
+
+    /*
+     * Consent is considered fully granted
+     * only when every permission is granted.
+     */
+    consent.consentGiven =
+      consent.dataShared.every(
+        (entry) => entry.granted
+      );
 
     await consent.save();
 
-    // Send real-time update to dashboard
-    getIO()
-      .to(`user:${req.user.id}`)
-      .emit('consent-updated', consent);
+    /*
+     * Send real-time update to dashboard.
+     */
+    emitConsentUpdated(
+      req.user.id,
+      consent
+    );
 
     return res.status(200).json({
       message: 'Consent updated',
@@ -135,26 +278,53 @@ exports.updateConsent = async (req, res) => {
     });
 
   } catch (err) {
-    console.error('[ERROR] updateConsent failed:', err);
+    console.error(
+      '[ERROR] updateConsent failed:',
+      err
+    );
+
     return res.status(500).json({
       error: 'Server error'
     });
   }
 };
 
+
 // POST /api/consent/check-origin
-// Lets the extension ask "have I already logged this site for this user?"
-exports.checkOrigin = async (req, res) => {
+// Lets the extension ask:
+// "Have I already logged this site for this user?"
+exports.checkOrigin = async (
+  req,
+  res
+) => {
   try {
     const { origin } = req.body;
+
     if (!origin) {
-      return res.status(400).json({ error: 'origin is required' });
+      return res.status(400).json({
+        error: 'origin is required'
+      });
     }
 
-    const existing = await ConsentLog.findOne({ userId: req.user.id, service: origin });
-    res.json({ exists: !!existing, consent: existing || null });
+    const existing =
+      await ConsentLog.findOne({
+        userId: req.user.id,
+        service: origin
+      });
+
+    return res.json({
+      exists: !!existing,
+      consent: existing || null
+    });
+
   } catch (err) {
-    console.error('checkOrigin error:', err);
-    res.status(500).json({ error: 'Server error' });
+    console.error(
+      'checkOrigin error:',
+      err
+    );
+
+    return res.status(500).json({
+      error: 'Server error'
+    });
   }
 };
