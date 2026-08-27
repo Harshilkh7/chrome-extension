@@ -42,37 +42,6 @@ Our solution is a **Real-Time Web Permission Tracker** powered by a Chrome Exten
 - **Authentication:** JWT (JSON Web Tokens)  
 - **Other Tools:** Webpack, Babel, ESLint
 
-## Screenshots
-
-> _Add your screenshots here_
-
-- **Home Screenshot**
-
-
-
-
-
-
-
-- **Dashboard Screenshot**
-
-
-
-
-
-- **Setting Screenshot**
-
-
-
-
-
-
-- **Login Screenshot**
-
-
-
-
-
 ### Prerequisites
 
 - Node.js (v14+)
