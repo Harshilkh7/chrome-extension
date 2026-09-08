@@ -1,6 +1,9 @@
 const { GoogleGenAI } = require('@google/genai');
 
 const DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+const FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || 'gemini-3.7-flash';
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 1500;
 
 const riskSchema = {
   type: 'object',
@@ -51,23 +54,58 @@ function buildPrompt(consents) {
   ].join('\n');
 }
 
+function isTemporaryModelError(error) {
+  return error?.status === 503 || error?.status === 429 ||
+    error?.error?.status === 'UNAVAILABLE' ||
+    error?.error?.status === 'RESOURCE_EXHAUSTED';
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function generateAnalysis(ai, model, prompt) {
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
+    try {
+      return await ai.models.generateContent({
+        model,
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: riskSchema,
+        },
+      });
+    } catch (error) {
+      if (!isTemporaryModelError(error) || attempt === MAX_RETRIES) {
+        throw error;
+      }
+
+      await sleep(RETRY_DELAY_MS * attempt);
+    }
+  }
+}
+
 async function analyzePermissions(consents) {
   if (!process.env.GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY is not configured');
   }
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const prompt = buildPrompt(consents);
 
-  const response = await ai.models.generateContent({
-    model: DEFAULT_MODEL,
-    contents: buildPrompt(consents),
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: riskSchema,
-    },
-  });
+  let response;
 
-  if (!response.text) {
+  try {
+    response = await generateAnalysis(ai, DEFAULT_MODEL, prompt);
+  } catch (error) {
+    if (!isTemporaryModelError(error) || DEFAULT_MODEL === FALLBACK_MODEL) {
+      throw error;
+    }
+
+    response = await generateAnalysis(ai, FALLBACK_MODEL, prompt);
+  }
+
+  if (!response?.text) {
     throw new Error('Gemini returned no analysis');
   }
 
