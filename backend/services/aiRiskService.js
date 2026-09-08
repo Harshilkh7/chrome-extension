@@ -1,5 +1,6 @@
-const OPENAI_URL = 'https://api.openai.com/v1/responses';
-const DEFAULT_MODEL = process.env.OPENAI_MODEL || 'gpt-5.6-luna';
+const { GoogleGenAI } = require('@google/genai');
+
+const DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 
 const riskSchema = {
   type: 'object',
@@ -44,58 +45,33 @@ function buildPrompt(consents) {
     'Consider camera, microphone, location, notifications, clipboard, downloads, and other browser permissions according to their sensitivity.',
     'Keep reasons and recommendations concise and actionable.',
     'Confidence must be a number from 0 to 100 and should reflect uncertainty in the available context.',
+    'Return one analysis entry for every supplied permission record.',
     '',
     `Permission records:\n${JSON.stringify(consents, null, 2)}`,
   ].join('\n');
 }
 
 async function analyzePermissions(consents) {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY is not configured');
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY is not configured');
   }
 
-  const response = await fetch(OPENAI_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+  const response = await ai.models.generateContent({
+    model: DEFAULT_MODEL,
+    contents: buildPrompt(consents),
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: riskSchema,
     },
-    body: JSON.stringify({
-      model: DEFAULT_MODEL,
-      store: false,
-      input: [
-        {
-          role: 'system',
-          content: 'Return a structured browser-permission security assessment. Never invent permissions that are not present in the input.',
-        },
-        {
-          role: 'user',
-          content: buildPrompt(consents),
-        },
-      ],
-      text: {
-        format: {
-          type: 'json_schema',
-          name: 'permission_risk_analysis',
-          strict: true,
-          schema: riskSchema,
-        },
-      },
-    }),
   });
 
-  const body = await response.json();
-
-  if (!response.ok) {
-    console.error('OpenAI API error:', body);
-    throw new Error(body?.error?.message || 'AI analysis failed');
+  if (!response.text) {
+    throw new Error('Gemini returned no analysis');
   }
 
-  if (!body.output_text) {
-    throw new Error('AI returned no analysis');
-  }
-
-  return JSON.parse(body.output_text);
+  return JSON.parse(response.text);
 }
 
 module.exports = { analyzePermissions };
