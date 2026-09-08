@@ -103,7 +103,7 @@ export default function Dashboard() {
       console.error('AI analysis failed:', err);
       setError(
         err.response?.data?.error ||
-          'AI analysis failed. Make sure OPENAI_API_KEY is configured on the backend.'
+          'AI analysis failed. Make sure GEMINI_API_KEY is configured on the backend.'
       );
     } finally {
       setAnalyzing(false);
@@ -122,8 +122,6 @@ export default function Dashboard() {
         state,
       });
 
-      // Optimistically reflect the requested browser state. The extension
-      // applies the actual Chrome content setting during its next sync.
       if (state === 'block' || state === 'allow') {
         setConsents((current) =>
           current.map((consent) => {
