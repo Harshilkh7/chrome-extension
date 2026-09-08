@@ -8,6 +8,8 @@ import {
   CalendarDays,
   Sparkles,
   RefreshCw,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 
 import { socket, connectSocket, disconnectSocket } from '../services/socket';
@@ -21,12 +23,22 @@ const riskClasses = {
   CRITICAL: 'bg-red-100 text-red-700',
 };
 
+const controllablePermissions = new Set([
+  'camera',
+  'microphone',
+  'location',
+  'notifications',
+  'clipboard',
+  'automaticDownloads',
+]);
+
 export default function Dashboard() {
   const [consents, setConsents] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [aiSummary, setAiSummary] = useState('');
+  const [controlLoading, setControlLoading] = useState('');
 
   useEffect(() => {
     const loadConsents = async () => {
@@ -98,22 +110,94 @@ export default function Dashboard() {
     }
   };
 
+  const setPermissionControl = async (service, permission, state) => {
+    const key = `${service}:${permission}`;
+    setControlLoading(key);
+    setError('');
+
+    try {
+      await api.post('/permission-control', {
+        service,
+        permission,
+        state,
+      });
+
+      // Optimistically reflect the requested browser state. The extension
+      // applies the actual Chrome content setting during its next sync.
+      if (state === 'block' || state === 'allow') {
+        setConsents((current) =>
+          current.map((consent) => {
+            if (consent.service !== service) return consent;
+            return {
+              ...consent,
+              dataShared: consent.dataShared.map((entry) =>
+                entry.permission === permission
+                  ? { ...entry, granted: state === 'allow' }
+                  : entry
+              ),
+            };
+          })
+        );
+      }
+    } catch (err) {
+      console.error('Permission control failed:', err);
+      setError(err.response?.data?.error || 'Could not change browser permission');
+    } finally {
+      setControlLoading('');
+    }
+  };
+
   const renderPermissions = (consent) => {
     if (!Array.isArray(consent.dataShared)) return null;
 
-    return consent.dataShared.map(({ permission, granted }) => (
-      <div
-        key={permission}
-        className="flex justify-between items-center mb-2 px-3 py-2 rounded-md hover:bg-indigo-50"
-      >
-        <p className="text-gray-700 text-sm">
-          <span className="font-medium">{permission}:</span>{' '}
-          <span className={granted ? 'text-green-600' : 'text-red-600'}>
-            {granted ? 'Granted' : 'Denied'}
-          </span>
-        </p>
-      </div>
-    ));
+    return consent.dataShared.map(({ permission, granted }) => {
+      const key = `${consent.service}:${permission}`;
+      const controllable = controllablePermissions.has(permission);
+
+      return (
+        <div
+          key={permission}
+          className="flex flex-col gap-2 mb-2 px-3 py-2 rounded-md hover:bg-indigo-50"
+        >
+          <div className="flex justify-between items-center gap-2">
+            <p className="text-gray-700 text-sm">
+              <span className="font-medium">{permission}:</span>{' '}
+              <span className={granted ? 'text-green-600' : 'text-red-600'}>
+                {granted ? 'Granted' : 'Denied'}
+              </span>
+            </p>
+
+            {controllable && (
+              <button
+                type="button"
+                disabled={controlLoading === key}
+                onClick={() =>
+                  setPermissionControl(
+                    consent.service,
+                    permission,
+                    granted ? 'block' : 'allow'
+                  )
+                }
+                className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold disabled:opacity-50 ${
+                  granted
+                    ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                    : 'bg-green-100 text-green-700 hover:bg-green-200'
+                }`}
+              >
+                {controlLoading === key ? (
+                  <RefreshCw className="h-3 w-3 animate-spin" />
+                ) : granted ? (
+                  <Lock className="h-3 w-3" />
+                ) : (
+                  <Unlock className="h-3 w-3" />
+                )}
+                {granted ? 'Turn Off' : 'Allow'}
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    });
   };
 
   const highRiskCount = consents.filter(
@@ -147,6 +231,10 @@ export default function Dashboard() {
               {analyzing ? 'Analyzing...' : 'AI Security Analysis'}
             </button>
           </div>
+        </div>
+
+        <div className="mb-6 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+          <strong>Browser control:</strong> Turn Off blocks the selected site permission in Chrome. Allow restores it. The extension applies the dashboard decision locally through Chrome's content settings API.
         </div>
 
         {error && (
@@ -224,12 +312,6 @@ export default function Dashboard() {
                     </p>
                   </div>
                 )}
-
-                <div className="mt-4 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
-                  Dashboard cannot directly revoke a website permission. Chrome does not expose a
-                  web API that lets a website or normal extension arbitrarily remove a site's
-                  camera, microphone, location, or similar browser permission.
-                </div>
               </motion.div>
             ))}
           </div>
