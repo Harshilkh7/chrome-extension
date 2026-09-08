@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "ExtensPro - Permission Tracker",
-  "version": "1.0",
+  "version": "1.1",
   "description": "Tracks website permission usage (camera, mic, location, notifications) and logs it to your ExtensPro dashboard.",
 
-  "permissions": ["storage", "tabs"],
+  "permissions": ["storage", "tabs", "contentSettings", "alarms"],
   "host_permissions": ["<all_urls>"],
 
   "background": {
