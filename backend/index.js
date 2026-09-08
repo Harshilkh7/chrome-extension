@@ -13,6 +13,7 @@ require('dotenv').config();
 const authRoutes = require('./routes/authRoutes');
 const consentRoutes = require('./routes/consentRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const permissionControlRoutes = require('./routes/permissionControlRoutes');
 const userRoutes = require('./routes/userRoutes');
 const errorHandler = require('./middlewares/errorHandler');
 
@@ -60,6 +61,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/consent', consentRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/permission-control', permissionControlRoutes);
 app.use('/api/user', userRoutes);
 
 app.use('/api', (req, res) => {
