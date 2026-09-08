@@ -12,6 +12,7 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/authRoutes');
 const consentRoutes = require('./routes/consentRoutes');
+const aiRoutes = require('./routes/aiRoutes');
 const userRoutes = require('./routes/userRoutes');
 const errorHandler = require('./middlewares/errorHandler');
 
@@ -41,10 +42,6 @@ app.use(
       if (origin.startsWith('chrome-extension://')) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
 
-      // The extension's content scripts make API requests from the
-      // website page context, so the browser Origin can be the site
-      // being visited (for example https://meet.google.com).
-      // Authentication is still enforced by JWT middleware.
       if (origin.startsWith('http://') || origin.startsWith('https://')) {
         return callback(null, true);
       }
@@ -62,6 +59,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/consent', consentRoutes);
+app.use('/api/ai', aiRoutes);
 app.use('/api/user', userRoutes);
 
 app.use('/api', (req, res) => {
