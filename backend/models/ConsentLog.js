@@ -8,7 +8,6 @@ const consentLogSchema = new mongoose.Schema(
       required: true,
     },
     service: {
-      // the site's origin, e.g. "https://example.com"
       type: String,
       required: true,
       trim: true,
@@ -20,9 +19,31 @@ const consentLogSchema = new mongoose.Schema(
       },
     ],
     consentGiven: {
-      // true only while every tracked permission for this service is granted
       type: Boolean,
       required: true,
+    },
+    aiRisk: {
+      type: String,
+      enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],
+      default: null,
+    },
+    aiReason: {
+      type: String,
+      default: '',
+    },
+    aiRecommendation: {
+      type: String,
+      default: '',
+    },
+    aiConfidence: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: null,
+    },
+    aiAnalyzedAt: {
+      type: Date,
+      default: null,
     },
     timestamp: {
       type: Date,
