@@ -24,17 +24,11 @@ if (!process.env.JWT_SECRET || !process.env.DB_URI) {
   process.exit(1);
 }
 
-// ---------------------------------------------------------------
-// Database
-// ---------------------------------------------------------------
 mongoose
   .connect(process.env.DB_URI)
   .then(() => console.log('MongoDB connected'.bgGreen))
   .catch((err) => console.error('MongoDB connection error:'.bgRed, err));
 
-// ---------------------------------------------------------------
-// CORS
-// ---------------------------------------------------------------
 const allowedOrigins = (process.env.CLIENT_ORIGINS || 'http://localhost:5173')
   .split(',')
   .map((o) => o.trim())
@@ -46,6 +40,15 @@ app.use(
       if (!origin) return callback(null, true);
       if (origin.startsWith('chrome-extension://')) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
+
+      // The extension's content scripts make API requests from the
+      // website page context, so the browser Origin can be the site
+      // being visited (for example https://meet.google.com).
+      // Authentication is still enforced by JWT middleware.
+      if (origin.startsWith('http://') || origin.startsWith('https://')) {
+        return callback(null, true);
+      }
+
       return callback(new Error(`Origin ${origin} not allowed by CORS`));
     },
     credentials: true,
@@ -55,21 +58,16 @@ app.use(
 app.use(morgan('dev'));
 app.use(express.json());
 
-// ---------------------------------------------------------------
-// Routes
-// ---------------------------------------------------------------
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/consent', consentRoutes);
 app.use('/api/user', userRoutes);
 
-// 404 for anything else under /api
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
-// Global error handler (must be last)
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 8000;
